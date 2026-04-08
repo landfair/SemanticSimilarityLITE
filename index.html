@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Writing Style Comparison</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --purple: #57068c;
+            --purple-light: rgba(87, 6, 140, 0.08);
+            --bg: #f8f9fa;
+            --white: #ffffff;
+            --border: #dee2e6;
+            --text-dark: #212529;
+            --text-muted: #6c757d;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background: var(--bg);
+            color: var(--text-dark);
+            min-height: 100vh;
+        }
+
+        /* Fixed Header */
+        .fixed-header {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            height: 60px;
+            background: var(--purple);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            z-index: 100;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: var(--white);
+        }
+
+        .header-left i { font-size: 20px; opacity: 0.9; }
+
+        .header-title {
+            font-size: 16px;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+        }
+
+        .reset-btn {
+            background: rgba(255,255,255,0.15);
+            color: var(--white);
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 7px 16px;
+            border-radius: 6px;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: background 0.2s;
+        }
+
+        .reset-btn:hover { background: rgba(255,255,255,0.25); }
+
+        /* Main content */
+        .main {
+            margin-top: 60px;
+            padding: 32px 24px;
+            max-width: 1200px;
+            margin-left: auto;
+            margin-right: auto;
+            margin-top: 60px;
+        }
+
+        /* Upload screen */
+        #uploadScreen {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: calc(100vh - 60px);
+        }
+
+        .upload-card {
+            background: var(--white);
+            border: 2px dashed var(--border);
+            border-radius: 16px;
+            padding: 56px 48px;
+            text-align: center;
+            max-width: 520px;
+            width: 100%;
+            transition: border-color 0.2s;
+        }
+
+        .upload-card:hover { border-color: var(--purple); }
+
+        .upload-card .upload-icon {
+            font-size: 48px;
+            color: var(--purple);
+            margin-bottom: 20px;
+            opacity: 0.7;
+        }
+
+        .upload-card h2 {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--text-dark);
+            margin-bottom: 10px;
+        }
+
+        .upload-card p {
+            font-size: 14px;
+            color: var(--text-muted);
+            line-height: 1.6;
+            margin-bottom: 28px;
+        }
+
+        .upload-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--purple);
+            color: var(--white);
+            border: none;
+            padding: 12px 28px;
+            border-radius: 8px;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            margin-bottom: 20px;
+        }
+
+        .upload-btn:hover { opacity: 0.88; }
+
+        .format-hint {
+            font-size: 12px;
+            color: var(--text-muted);
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 10px 14px;
+            font-family: monospace;
+            text-align: left;
+            line-height: 1.7;
+        }
+
+        .format-hint strong {
+            display: block;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+            color: var(--text-dark);
+        }
+
+        /* Error message */
+        .error-msg {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-size: 13px;
+            color: #856404;
+            margin-top: 16px;
+            display: none;
+        }
+
+        /* Info strip */
+        .info-strip {
+            background: var(--purple);
+            color: var(--white);
+            border-radius: 10px;
+            padding: 14px 20px;
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            margin-bottom: 24px;
+            font-size: 13px;
+            flex-wrap: wrap;
+        }
+
+        .info-item {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+        }
+
+        .info-item i { opacity: 0.8; font-size: 14px; }
+
+        /* Cards */
+        .card {
+            background: var(--white);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 24px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+        }
+
+        .card-header {
+            background: var(--purple-light);
+            border-bottom: 1px solid var(--border);
+            padding: 14px 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--purple);
+        }
+
+        .card-header i { font-size: 15px; }
+
+        .card-body { padding: 20px; overflow-x: auto; }
+
+        /* Matrix table */
+        .matrix-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .matrix-table th {
+            background: var(--purple);
+            color: var(--white);
+            padding: 10px 16px;
+            font-weight: 600;
+            text-align: center;
+            font-size: 12px;
+            letter-spacing: 0.3px;
+        }
+
+        .matrix-table th:first-child {
+            background: var(--bg);
+            color: transparent;
+        }
+
+        .matrix-table td {
+            padding: 0;
+            border: 1px solid var(--border);
+        }
+
+        .matrix-cell {
+            padding: 12px 16px;
+            text-align: center;
+            min-width: 160px;
+        }
+
+        .matrix-cell .metric-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            padding: 2px 0;
+        }
+
+        .matrix-cell .metric-label { opacity: 0.75; }
+        .matrix-cell .metric-val { font-weight: 600; }
+
+        .matrix-diagonal {
+            background: #f1f3f5;
+            color: var(--text-muted);
+            text-align: center;
+            padding: 12px 16px;
+            font-size: 20px;
+            font-weight: 300;
+        }
+
+        /* Score cards grid */
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 20px;
+        }
+
+        /* Metrics table inside score card */
+        .metrics-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .metrics-table th {
+            background: var(--purple-light);
+            color: var(--purple);
+            font-weight: 600;
+            font-size: 12px;
+            padding: 8px 12px;
+            text-align: center;
+            border: 1px solid var(--border);
+        }
+
+        .metrics-table th:first-child { text-align: left; }
+
+        .metrics-table td {
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            font-size: 13px;
+        }
+
+        .metrics-table tr:nth-child(even) td { background: #fafafa; }
+
+        .score-cell {
+            text-align: center;
+            font-weight: 600;
+            color: var(--purple);
+        }
+
+        .hidden { display: none !important; }
+
+        /* Drag-over state */
+        .upload-card.drag-over {
+            border-color: var(--purple);
+            background: var(--purple-light);
+        }
+    </style>
+</head>
+<body>
+
+<!-- Fixed Header -->
+<header class="fixed-header">
+    <div class="header-left">
+        <i class="fas fa-chart-bar"></i>
+        <span class="header-title">AI Writing Style Comparison</span>
+    </div>
+    <button class="reset-btn hidden" id="resetBtn" onclick="reset()">
+        <i class="fas fa-redo-alt"></i> Reset
+    </button>
+</header>
+
+<!-- Upload Screen -->
+<div id="uploadScreen">
+    <div class="upload-card" id="uploadCard">
+        <div class="upload-icon"><i class="fas fa-file-csv"></i></div>
+        <h2>Upload Comparison CSV</h2>
+        <p>Upload a CSV file with one column per AI model. Pairwise similarity scores will be computed for each prompt row using four metrics.</p>
+        <button class="upload-btn" onclick="document.getElementById('csvFile').click()">
+            <i class="fas fa-upload"></i> Choose CSV File
+        </button>
+        <div class="format-hint">
+            <strong>Expected format</strong>
+            ID, ChatGPT, Gemini, Claude<br>
+            Q1, "The transformer...", "Large language...", "I understand..."<br>
+            Q2, "When considering...", "Climate change...", "Climate change..."
+        </div>
+        <div class="error-msg" id="errorMsg"></div>
+    </div>
+</div>
+
+<!-- Results Area -->
+<div id="resultsArea" class="main hidden">
+    <div id="infoStrip" class="info-strip"></div>
+    <div id="matrixContainer"></div>
+    <div id="scoreCardsContainer" class="cards-grid"></div>
+</div>
+
+<!-- Hidden file input -->
+<input type="file" id="csvFile" accept=".csv" class="hidden" onchange="handleFileUpload(event)">
+
+<script>
+    // ─── CSV Parser (from index.html) ────────────────────────────────────────
+
+    function parseCSVText(text) {
+        const rows = [];
+        let currentRow = [];
+        let currentField = '';
+        let inQuotes = false;
+
+        for (let i = 0; i < text.length; i++) {
+            const char = text[i];
+            const nextChar = text[i + 1];
+
+            if (inQuotes) {
+                if (char === '"' && nextChar === '"') {
+                    currentField += '"';
+                    i++;
+                } else if (char === '"') {
+                    inQuotes = false;
+                } else {
+                    currentField += char;
+                }
+            } else {
+                if (char === '"') {
+                    inQuotes = true;
+                } else if (char === ',') {
+                    currentRow.push(currentField.trim());
+                    currentField = '';
+                } else if (char === '\n' || (char === '\r' && nextChar === '\n')) {
+                    if (char === '\r') i++;
+                    currentRow.push(currentField.trim());
+                    if (currentRow.some(field => field !== '')) {
+                        rows.push(currentRow);
+                    }
+                    currentRow = [];
+                    currentField = '';
+                } else if (char !== '\r') {
+                    currentField += char;
+                }
+            }
+        }
+
+        currentRow.push(currentField.trim());
+        if (currentRow.some(field => field !== '')) {
+            rows.push(currentRow);
+        }
+
+        return rows;
+    }
+
+    // ─── Tokenizer (from index.html) ─────────────────────────────────────────
+
+    function tokenize(text) {
+        return text.toLowerCase()
+            .replace(/[\u2018\u2019\u201C\u201D]/g, "'")
+            .replace(/[^\w\s']/g, ' ')
+            .split(/\s+/)
+            .filter(w => w.length > 0);
+    }
+
+    // ─── Similarity Metrics (from index.html) ────────────────────────────────
+
+    function cosineSimilarity(text1, text2) {
+        const words1 = tokenize(text1);
+        const words2 = tokenize(text2);
+        const freq1 = {};
+        const freq2 = {};
+        const allWords = new Set([...words1, ...words2]);
+
+        words1.forEach(w => freq1[w] = (freq1[w] || 0) + 1);
+        words2.forEach(w => freq2[w] = (freq2[w] || 0) + 1);
+
+        let dotProduct = 0, mag1 = 0, mag2 = 0;
+        allWords.forEach(word => {
+            const v1 = freq1[word] || 0;
+            const v2 = freq2[word] || 0;
+            dotProduct += v1 * v2;
+            mag1 += v1 * v1;
+            mag2 += v2 * v2;
+        });
+
+        return (mag1 === 0 || mag2 === 0) ? 0 : dotProduct / (Math.sqrt(mag1) * Math.sqrt(mag2));
+    }
+
+    function jaccardSimilarity(text1, text2) {
+        const set1 = new Set(tokenize(text1));
+        const set2 = new Set(tokenize(text2));
+        const intersection = new Set([...set1].filter(x => set2.has(x)));
+        const union = new Set([...set1, ...set2]);
+        return union.size === 0 ? 0 : intersection.size / union.size;
+    }
+
+    function ngramSimilarity(text1, text2, n = 3) {
+        const getNgrams = (text) => {
+            const ngrams = new Set();
+            const clean = text.toLowerCase().replace(/[^\w\s]/g, '');
+            for (let i = 0; i <= clean.length - n; i++) {
+                ngrams.add(clean.substring(i, i + n));
+            }
+            return ngrams;
+        };
+
+        const ngrams1 = getNgrams(text1);
+        const ngrams2 = getNgrams(text2);
+        const intersection = new Set([...ngrams1].filter(x => ngrams2.has(x)));
+        const union = new Set([...ngrams1, ...ngrams2]);
+        return union.size === 0 ? 0 : intersection.size / union.size;
+    }
+
+    // ─── New Implementations ─────────────────────────────────────────────────
+
+    function sorensenDice(text1, text2) {
+        const set1 = new Set(tokenize(text1));
+        const set2 = new Set(tokenize(text2));
+        if (set1.size === 0 && set2.size === 0) return 0;
+        const intersection = new Set([...set1].filter(x => set2.has(x)));
+        return (2 * intersection.size) / (set1.size + set2.size);
+    }
+
+    function computeAllMetrics(text1, text2) {
+        return {
+            cosine:  cosineSimilarity(text1, text2),
+            jaccard: jaccardSimilarity(text1, text2),
+            ngram:   ngramSimilarity(text1, text2, 3),
+            dice:    sorensenDice(text1, text2)
+        };
+    }
+
+    // ─── Utilities ───────────────────────────────────────────────────────────
+
+    function fmt(score) {
+        return (score * 100).toFixed(1) + '%';
+    }
+
+    function showError(msg) {
+        const el = document.getElementById('errorMsg');
+        el.textContent = msg;
+        el.style.display = 'block';
+    }
+
+    function clearError() {
+        const el = document.getElementById('errorMsg');
+        el.style.display = 'none';
+        el.textContent = '';
+    }
+
+    // ─── Data Processing ─────────────────────────────────────────────────────
+
+    function processData(rows, filename) {
+        if (rows.length < 2) {
+            showError('CSV must have at least 2 rows (header + 1 data row).');
+            return;
+        }
+
+        const headers = rows[0];
+        const groupNames = headers.slice(1); // skip ID column
+
+        if (groupNames.length < 2) {
+            showError('CSV must have at least 2 text columns (after the ID column).');
+            return;
+        }
+
+        const dataRows = rows.slice(1);
+
+        // Build pairs
+        const pairs = [];
+        for (let i = 0; i < groupNames.length; i++) {
+            for (let j = i + 1; j < groupNames.length; j++) {
+                pairs.push({ i, j, label: `${groupNames[i]} vs ${groupNames[j]}` });
+            }
+        }
+
+        // Per-row metrics + accumulators for averages
+        const sums = pairs.map(() => ({ cosine: 0, jaccard: 0, ngram: 0, dice: 0, count: 0 }));
+        const rowResults = [];
+
+        dataRows.forEach(row => {
+            const id = row[0] || '?';
+            const texts = row.slice(1);
+            const pairMetrics = pairs.map((pair, pi) => {
+                const t1 = texts[pair.i] || '';
+                const t2 = texts[pair.j] || '';
+                const m = computeAllMetrics(t1, t2);
+                sums[pi].cosine  += m.cosine;
+                sums[pi].jaccard += m.jaccard;
+                sums[pi].ngram   += m.ngram;
+                sums[pi].dice    += m.dice;
+                sums[pi].count++;
+                return m;
+            });
+            rowResults.push({ id, pairMetrics });
+        });
+
+        // Averages per pair
+        const avgMetrics = sums.map(s => ({
+            cosine:  s.count ? s.cosine  / s.count : 0,
+            jaccard: s.count ? s.jaccard / s.count : 0,
+            ngram:   s.count ? s.ngram   / s.count : 0,
+            dice:    s.count ? s.dice    / s.count : 0,
+        }));
+
+        renderInfoStrip(filename, dataRows.length, groupNames);
+        renderMatrix(groupNames, pairs, avgMetrics);
+        renderScoreCards(rowResults, pairs);
+
+        document.getElementById('uploadScreen').classList.add('hidden');
+        document.getElementById('resultsArea').classList.remove('hidden');
+        document.getElementById('resetBtn').classList.remove('hidden');
+    }
+
+    // ─── Render: Info Strip ───────────────────────────────────────────────────
+
+    function renderInfoStrip(filename, rowCount, groupNames) {
+        document.getElementById('infoStrip').innerHTML = `
+            <div class="info-item"><i class="fas fa-file-csv"></i> ${filename}</div>
+            <div class="info-item"><i class="fas fa-list-ol"></i> ${rowCount} prompt${rowCount !== 1 ? 's' : ''}</div>
+            <div class="info-item"><i class="fas fa-robot"></i> ${groupNames.join(', ')}</div>
+            <div class="info-item"><i class="fas fa-calculator"></i> 4 metrics · ${groupNames.length} models · ${groupNames.length * (groupNames.length - 1) / 2} pairs</div>
+        `;
+    }
+
+    // ─── Render: Matrix ───────────────────────────────────────────────────────
+
+    function renderMatrix(groupNames, pairs, avgMetrics) {
+        const N = groupNames.length;
+
+        // Build lookup: (i,j) → avgMetrics index
+        const lookup = {};
+        pairs.forEach((pair, pi) => {
+            lookup[`${pair.i},${pair.j}`] = pi;
+            lookup[`${pair.j},${pair.i}`] = pi;
+        });
+
+        let html = `
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-th"></i> Aggregate Similarity Matrix (all prompts)
+                </div>
+                <div class="card-body">
+                    <table class="matrix-table">
+                        <thead><tr>
+                            <th></th>
+                            ${groupNames.map(g => `<th>${g}</th>`).join('')}
+                        </tr></thead>
+                        <tbody>
+        `;
+
+        for (let r = 0; r < N; r++) {
+            html += `<tr><th style="background:var(--purple);color:var(--white);padding:10px 16px;font-size:12px;font-weight:600;">${groupNames[r]}</th>`;
+            for (let c = 0; c < N; c++) {
+                if (r === c) {
+                    html += `<td><div class="matrix-diagonal">—</div></td>`;
+                } else {
+                    const pi = lookup[`${r},${c}`];
+                    const m = avgMetrics[pi];
+                    const avg = (m.cosine + m.jaccard + m.ngram + m.dice) / 4;
+                    const bgAlpha = avg * 0.65;
+                    const bg = `rgba(87,6,140,${bgAlpha.toFixed(3)})`;
+                    const textColor = avg > 0.55 ? '#ffffff' : 'var(--text-dark)';
+                    html += `
+                        <td>
+                            <div class="matrix-cell" style="background:${bg};color:${textColor};">
+                                <div class="metric-row">
+                                    <span class="metric-label">Cosine</span>
+                                    <span class="metric-val">${fmt(m.cosine)}</span>
+                                </div>
+                                <div class="metric-row">
+                                    <span class="metric-label">Jaccard</span>
+                                    <span class="metric-val">${fmt(m.jaccard)}</span>
+                                </div>
+                                <div class="metric-row">
+                                    <span class="metric-label">Q-gram</span>
+                                    <span class="metric-val">${fmt(m.ngram)}</span>
+                                </div>
+                                <div class="metric-row">
+                                    <span class="metric-label">Dice</span>
+                                    <span class="metric-val">${fmt(m.dice)}</span>
+                                </div>
+                            </div>
+                        </td>`;
+                }
+            }
+            html += `</tr>`;
+        }
+
+        html += `</tbody></table></div></div>`;
+        document.getElementById('matrixContainer').innerHTML = html;
+    }
+
+    // ─── Render: Score Cards ──────────────────────────────────────────────────
+
+    function renderScoreCards(rowResults, pairs) {
+        const container = document.getElementById('scoreCardsContainer');
+        const metricLabels = ['Cosine Similarity', 'Jaccard Index', 'Q-gram (n=3)', 'Sørensen–Dice'];
+        const metricKeys  = ['cosine', 'jaccard', 'ngram', 'dice'];
+
+        let html = '';
+        rowResults.forEach(({ id, pairMetrics }) => {
+            html += `
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-comment-dots"></i> Prompt ${id}
+                    </div>
+                    <div class="card-body">
+                        <table class="metrics-table">
+                            <thead><tr>
+                                <th>Metric</th>
+                                ${pairs.map(p => `<th>${p.label}</th>`).join('')}
+                            </tr></thead>
+                            <tbody>
+                                ${metricLabels.map((label, mi) => `
+                                    <tr>
+                                        <td>${label}</td>
+                                        ${pairMetrics.map(m => `
+                                            <td class="score-cell">${fmt(m[metricKeys[mi]])}</td>
+                                        `).join('')}
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
+    }
+
+    // ─── File Upload ──────────────────────────────────────────────────────────
+
+    function handleFileUpload(event) {
+        clearError();
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const rows = parseCSVText(e.target.result);
+                processData(rows, file.name);
+            } catch (err) {
+                showError('Failed to parse CSV: ' + err.message);
+            }
+        };
+        reader.readAsText(file);
+
+        // Reset input so same file can be re-uploaded after reset
+        event.target.value = '';
+    }
+
+    // ─── Reset ────────────────────────────────────────────────────────────────
+
+    function reset() {
+        document.getElementById('scoreCardsContainer').innerHTML = '';
+        document.getElementById('matrixContainer').innerHTML = '';
+        document.getElementById('infoStrip').innerHTML = '';
+        document.getElementById('resultsArea').classList.add('hidden');
+        document.getElementById('uploadScreen').classList.remove('hidden');
+        document.getElementById('resetBtn').classList.add('hidden');
+        clearError();
+    }
+
+    // ─── Drag-and-drop support ────────────────────────────────────────────────
+
+    const uploadCard = document.getElementById('uploadCard');
+
+    uploadCard.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadCard.classList.add('drag-over');
+    });
+
+    uploadCard.addEventListener('dragleave', () => {
+        uploadCard.classList.remove('drag-over');
+    });
+
+    uploadCard.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadCard.classList.remove('drag-over');
+        const file = e.dataTransfer.files[0];
+        if (file && file.name.endsWith('.csv')) {
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            const input = document.getElementById('csvFile');
+            input.files = dt.files;
+            handleFileUpload({ target: input });
+        } else {
+            showError('Please drop a .csv file.');
+        }
+    });
+</script>
+
+</body>
+</html>
