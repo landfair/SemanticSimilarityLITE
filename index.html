@@ -278,11 +278,11 @@
             font-weight: 300;
         }
 
-        /* Score cards grid */
+        /* Score cards — full width since each contains a matrix */
         .cards-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
-            gap: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
         }
 
         /* Metrics table inside score card */
@@ -574,7 +574,7 @@
 
         renderInfoStrip(filename, dataRows.length, groupNames);
         renderMatrix(groupNames, pairs, avgMetrics);
-        renderScoreCards(rowResults, pairs);
+        renderScoreCards(rowResults, pairs, groupNames);
 
         document.getElementById('uploadScreen').classList.add('hidden');
         document.getElementById('resultsArea').classList.remove('hidden');
@@ -594,10 +594,9 @@
 
     // ─── Render: Matrix ───────────────────────────────────────────────────────
 
-    function renderMatrix(groupNames, pairs, avgMetrics) {
+    // Shared helper: builds the inner <table> HTML for a matrix given a metrics array per pair
+    function buildMatrixTable(groupNames, pairs, metricsPerPair) {
         const N = groupNames.length;
-
-        // Build lookup: (i,j) → avgMetrics index
         const lookup = {};
         pairs.forEach((pair, pi) => {
             lookup[`${pair.i},${pair.j}`] = pi;
@@ -605,17 +604,12 @@
         });
 
         let html = `
-            <div class="card">
-                <div class="card-header">
-                    <i class="fas fa-th"></i> Aggregate Similarity Matrix (all prompts)
-                </div>
-                <div class="card-body">
-                    <table class="matrix-table">
-                        <thead><tr>
-                            <th></th>
-                            ${groupNames.map(g => `<th>${g}</th>`).join('')}
-                        </tr></thead>
-                        <tbody>
+            <table class="matrix-table">
+                <thead><tr>
+                    <th></th>
+                    ${groupNames.map(g => `<th>${g}</th>`).join('')}
+                </tr></thead>
+                <tbody>
         `;
 
         for (let r = 0; r < N; r++) {
@@ -625,10 +619,9 @@
                     html += `<td><div class="matrix-diagonal">—</div></td>`;
                 } else {
                     const pi = lookup[`${r},${c}`];
-                    const m = avgMetrics[pi];
+                    const m = metricsPerPair[pi];
                     const avg = (m.cosine + m.jaccard + m.ngram + m.dice) / 4;
-                    const bgAlpha = avg * 0.65;
-                    const bg = `rgba(87,6,140,${bgAlpha.toFixed(3)})`;
+                    const bg = `rgba(87,6,140,${(avg * 0.65).toFixed(3)})`;
                     const textColor = avg > 0.55 ? '#ffffff' : 'var(--text-dark)';
                     html += `
                         <td>
@@ -656,13 +649,26 @@
             html += `</tr>`;
         }
 
-        html += `</tbody></table></div></div>`;
+        html += `</tbody></table>`;
+        return html;
+    }
+
+    function renderMatrix(groupNames, pairs, avgMetrics) {
+        const html = `
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-th"></i> Aggregate Similarity Matrix (all prompts)
+                </div>
+                <div class="card-body">
+                    ${buildMatrixTable(groupNames, pairs, avgMetrics)}
+                </div>
+            </div>`;
         document.getElementById('matrixContainer').innerHTML = html;
     }
 
     // ─── Render: Score Cards ──────────────────────────────────────────────────
 
-    function renderScoreCards(rowResults, pairs) {
+    function renderScoreCards(rowResults, pairs, groupNames) {
         const container = document.getElementById('scoreCardsContainer');
         const metricLabels = ['Cosine Similarity', 'Jaccard Index', 'Q-gram (n=3)', 'Sørensen–Dice'];
         const metricKeys  = ['cosine', 'jaccard', 'ngram', 'dice'];
@@ -672,7 +678,7 @@
             html += `
                 <div class="card">
                     <div class="card-header">
-                        <i class="fas fa-comment-dots"></i> Prompt ${id}
+                        <i class="fas fa-comment-dots"></i> Prompt: ${id}
                     </div>
                     <div class="card-body">
                         <table class="metrics-table">
@@ -691,6 +697,12 @@
                                 `).join('')}
                             </tbody>
                         </table>
+                        <div style="margin-top:24px;">
+                            <div style="font-size:12px;font-weight:600;color:var(--purple);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">
+                                <i class="fas fa-th" style="margin-right:6px;"></i>Similarity Matrix — this prompt
+                            </div>
+                            ${buildMatrixTable(groupNames, pairs, pairMetrics)}
+                        </div>
                     </div>
                 </div>
             `;
