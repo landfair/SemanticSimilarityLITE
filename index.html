@@ -325,6 +325,180 @@
             border-color: var(--purple);
             background: var(--purple-light);
         }
+
+        /* Tooltip */
+        .has-tooltip {
+            position: relative;
+            cursor: help;
+            border-bottom: 1px dashed rgba(87,6,140,0.4);
+            display: inline-block;
+        }
+
+        .has-tooltip .tooltip-box {
+            visibility: hidden;
+            opacity: 0;
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1a1a2e;
+            color: #fff;
+            font-size: 12px;
+            font-weight: 400;
+            line-height: 1.55;
+            padding: 10px 13px;
+            border-radius: 7px;
+            width: 260px;
+            text-align: left;
+            z-index: 999;
+            pointer-events: none;
+            transition: opacity 0.15s;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+        }
+
+        .has-tooltip .tooltip-box::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-top-color: #1a1a2e;
+        }
+
+        .has-tooltip:hover .tooltip-box {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        /* About modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.55);
+            z-index: 500;
+            align-items: flex-start;
+            justify-content: center;
+            overflow-y: auto;
+            padding: 40px 16px;
+        }
+
+        .modal-overlay.open { display: flex; }
+
+        .modal {
+            background: var(--white);
+            border-radius: 14px;
+            max-width: 760px;
+            width: 100%;
+            box-shadow: 0 8px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+
+        .modal-header {
+            background: var(--purple);
+            color: var(--white);
+            padding: 18px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--white);
+            font-size: 20px;
+            cursor: pointer;
+            opacity: 0.8;
+            line-height: 1;
+            padding: 0;
+        }
+
+        .modal-close:hover { opacity: 1; }
+
+        .modal-body {
+            padding: 28px 28px 32px;
+        }
+
+        .about-intro {
+            font-size: 14px;
+            color: var(--text-muted);
+            line-height: 1.65;
+            margin-bottom: 28px;
+            border-left: 3px solid var(--purple);
+            padding-left: 14px;
+        }
+
+        .metric-block {
+            margin-bottom: 28px;
+            padding-bottom: 28px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .metric-block:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        .metric-block h3 {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--purple);
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .metric-tag {
+            font-size: 10px;
+            font-weight: 600;
+            background: var(--purple-light);
+            color: var(--purple);
+            border: 1px solid rgba(87,6,140,0.2);
+            border-radius: 4px;
+            padding: 2px 7px;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+
+        .metric-block p {
+            font-size: 13px;
+            color: var(--text-dark);
+            line-height: 1.65;
+            margin-bottom: 10px;
+        }
+
+        .metric-block .formula {
+            background: #f4f0f8;
+            border: 1px solid rgba(87,6,140,0.15);
+            border-radius: 7px;
+            padding: 10px 14px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            color: var(--purple);
+            margin: 10px 0;
+        }
+
+        .metric-block .steps {
+            font-size: 13px;
+            color: var(--text-dark);
+            line-height: 1.7;
+            padding-left: 18px;
+        }
+
+        .metric-block .steps li { margin-bottom: 4px; }
+
+        .metric-block .caveat {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-style: italic;
+            margin-top: 8px;
+        }
     </style>
 </head>
 <body>
@@ -335,10 +509,80 @@
         <i class="fas fa-chart-bar"></i>
         <span class="header-title">AI Writing Style Comparison</span>
     </div>
-    <button class="reset-btn hidden" id="resetBtn" onclick="reset()">
-        <i class="fas fa-redo-alt"></i> Reset
-    </button>
+    <div style="display:flex;gap:8px;align-items:center;">
+        <button class="reset-btn" onclick="document.getElementById('aboutModal').classList.add('open')">
+            <i class="fas fa-info-circle"></i> About
+        </button>
+        <button class="reset-btn hidden" id="resetBtn" onclick="reset()">
+            <i class="fas fa-redo-alt"></i> Reset
+        </button>
+    </div>
 </header>
+
+<!-- About Modal -->
+<div class="modal-overlay" id="aboutModal" onclick="if(event.target===this)this.classList.remove('open')">
+    <div class="modal">
+        <div class="modal-header">
+            <span><i class="fas fa-flask" style="margin-right:10px;"></i>How the Metrics Work</span>
+            <button class="modal-close" onclick="document.getElementById('aboutModal').classList.remove('open')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p class="about-intro">
+                All four metrics measure <strong>lexical surface similarity</strong> — how much two texts share the same words or character sequences. They do <em>not</em> measure semantic meaning. Scores range from 0 (no overlap) to 1 (identical), displayed here as percentages.
+            </p>
+
+            <div class="metric-block">
+                <h3><i class="fas fa-vector-square"></i> Cosine Similarity <span class="metric-tag">Bag-of-words</span></h3>
+                <p>Treats each text as a word-frequency vector and measures the angle between them. Two texts that use the same words proportionally — even at different lengths — score high.</p>
+                <div class="formula">cos(A, B) = (A · B) / (‖A‖ × ‖B‖)</div>
+                <ol class="steps">
+                    <li>Tokenize both texts (lowercase, strip punctuation, split on whitespace).</li>
+                    <li>Count word frequencies → two vectors over the shared vocabulary.</li>
+                    <li>Compute dot product of the vectors.</li>
+                    <li>Divide by the product of each vector's Euclidean magnitude.</li>
+                </ol>
+                <p class="caveat">Word order is ignored. "The cat sat" and "sat the cat" are identical. Length differences are normalized out.</p>
+            </div>
+
+            <div class="metric-block">
+                <h3><i class="fas fa-circle-nodes"></i> Jaccard Index <span class="metric-tag">Set overlap</span></h3>
+                <p>Measures the proportion of the shared vocabulary relative to the combined vocabulary. Each word is counted once regardless of frequency.</p>
+                <div class="formula">J(A, B) = |A ∩ B| / |A ∪ B|</div>
+                <ol class="steps">
+                    <li>Tokenize both texts → two sets of unique words.</li>
+                    <li>Count words in both sets (intersection).</li>
+                    <li>Count words in either set (union).</li>
+                    <li>Divide intersection size by union size.</li>
+                </ol>
+                <p class="caveat">Always ≤ Sørensen–Dice for the same pair — this is a mathematical property, not a bug. Jaccard penalizes dissimilarity more harshly.</p>
+            </div>
+
+            <div class="metric-block">
+                <h3><i class="fas fa-grip-dots"></i> Q-gram Similarity (n=3) <span class="metric-tag">Character n-grams</span></h3>
+                <p>Splits each text into overlapping 3-character substrings ("trigrams") and measures their Jaccard overlap. Catches partial word matches and spelling variations that word-level metrics miss.</p>
+                <div class="formula">Q(A, B) = |ngrams(A) ∩ ngrams(B)| / |ngrams(A) ∪ ngrams(B)|</div>
+                <ol class="steps">
+                    <li>Lowercase both texts, remove punctuation.</li>
+                    <li>Slide a 3-character window across each text → set of trigrams.</li>
+                    <li>Compute Jaccard overlap of the two trigram sets.</li>
+                </ol>
+                <p class="caveat">"time" and "times" share trigrams "tim" and "ime", so they contribute positively even though they are different words. More robust to morphological variation than word-level metrics.</p>
+            </div>
+
+            <div class="metric-block">
+                <h3><i class="fas fa-dice-d6"></i> Sørensen–Dice Coefficient <span class="metric-tag">Set overlap</span></h3>
+                <p>Like Jaccard but weights the intersection double, giving more credit to shared words and producing higher scores for the same overlap. Commonly used in NLP and ecology.</p>
+                <div class="formula">DSC(A, B) = 2|A ∩ B| / (|A| + |B|)</div>
+                <ol class="steps">
+                    <li>Tokenize both texts → two sets of unique words.</li>
+                    <li>Count the intersection (shared unique words).</li>
+                    <li>Divide 2× the intersection by the sum of both set sizes.</li>
+                </ol>
+                <p class="caveat">Always ≥ Jaccard for the same pair. If Jaccard = J, then Dice = 2J / (1 + J). Both metrics reach 1.0 only when the two vocabulary sets are identical.</p>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- Upload Screen -->
 <div id="uploadScreen">
@@ -627,19 +871,19 @@
                         <td>
                             <div class="matrix-cell" style="background:${bg};color:${textColor};">
                                 <div class="metric-row">
-                                    <span class="metric-label">Cosine</span>
+                                    <span class="metric-label has-tooltip" style="border-bottom-color:currentColor;">Cosine<span class="tooltip-box" style="color:#fff;">Word-frequency vectors. Measures angle between two texts' word-count vectors. Normalized for length.</span></span>
                                     <span class="metric-val">${fmt(m.cosine)}</span>
                                 </div>
                                 <div class="metric-row">
-                                    <span class="metric-label">Jaccard</span>
+                                    <span class="metric-label has-tooltip" style="border-bottom-color:currentColor;">Jaccard<span class="tooltip-box" style="color:#fff;">Unique-word set overlap: |A∩B| / |A∪B|. Always ≤ Dice for same pair.</span></span>
                                     <span class="metric-val">${fmt(m.jaccard)}</span>
                                 </div>
                                 <div class="metric-row">
-                                    <span class="metric-label">Q-gram</span>
+                                    <span class="metric-label has-tooltip" style="border-bottom-color:currentColor;">Q-gram<span class="tooltip-box" style="color:#fff;">Overlap of 3-character substrings. Catches partial word matches and morphological variation.</span></span>
                                     <span class="metric-val">${fmt(m.ngram)}</span>
                                 </div>
                                 <div class="metric-row">
-                                    <span class="metric-label">Dice</span>
+                                    <span class="metric-label has-tooltip" style="border-bottom-color:currentColor;">Dice<span class="tooltip-box" style="color:#fff;">Like Jaccard but doubles the intersection weight: 2|A∩B| / (|A|+|B|). Always ≥ Jaccard.</span></span>
                                     <span class="metric-val">${fmt(m.dice)}</span>
                                 </div>
                             </div>
@@ -672,6 +916,12 @@
         const container = document.getElementById('scoreCardsContainer');
         const metricLabels = ['Cosine Similarity', 'Jaccard Index', 'Q-gram (n=3)', 'Sørensen–Dice'];
         const metricKeys  = ['cosine', 'jaccard', 'ngram', 'dice'];
+        const metricTips  = [
+            'Word-frequency vectors. Measures the angle between two texts\' word-count vectors. Captures proportional word usage regardless of text length. Range: 0–1.',
+            'Unique-word set overlap. |intersection| / |union|. Each word counted once. Always ≤ Dice for the same pair. Range: 0–1.',
+            'Overlapping 3-character substrings (trigrams). Catches partial matches and morphological variation that word-level metrics miss. Range: 0–1.',
+            'Like Jaccard but weights shared words double: 2|A∩B| / (|A|+|B|). Always ≥ Jaccard. Reaches 1 only when both vocabulary sets are identical. Range: 0–1.'
+        ];
 
         let html = '';
         rowResults.forEach(({ id, pairMetrics }) => {
@@ -689,7 +939,11 @@
                             <tbody>
                                 ${metricLabels.map((label, mi) => `
                                     <tr>
-                                        <td>${label}</td>
+                                        <td>
+                                            <span class="has-tooltip">${label}
+                                                <span class="tooltip-box">${metricTips[mi]}</span>
+                                            </span>
+                                        </td>
                                         ${pairMetrics.map(m => `
                                             <td class="score-cell">${fmt(m[metricKeys[mi]])}</td>
                                         `).join('')}
