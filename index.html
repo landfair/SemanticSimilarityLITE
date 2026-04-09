@@ -345,15 +345,17 @@
     <div class="upload-card" id="uploadCard">
         <div class="upload-icon"><i class="fas fa-file-csv"></i></div>
         <h2>Upload Comparison CSV</h2>
-        <p>Upload a CSV file with one column per AI model. Pairwise similarity scores will be computed for each prompt row using four metrics.</p>
+        <p>Upload a CSV file with one column per response. Every response is compared against every other response using four metrics.</p>
         <button class="upload-btn" onclick="document.getElementById('csvFile').click()">
             <i class="fas fa-upload"></i> Choose CSV File
         </button>
         <div class="format-hint">
             <strong>Expected format</strong>
-            ID, ChatGPT, Gemini, Claude<br>
-            Q1, "The transformer...", "Large language...", "I understand..."<br>
-            Q2, "When considering...", "Climate change...", "Climate change..."
+            (blank),Claude_1,Claude_2,Claude_3,ChatGPT1,ChatGPT2,Gemini_1,...<br>
+            Create a metaphor for time,"Time is a river...","Time is a river...","Time is...",...<br>
+            <br>
+            Col 0: prompt text (used as row label)<br>
+            Col 1+: one response per column (any names, any count)
         </div>
         <div class="error-msg" id="errorMsg"></div>
     </div>
@@ -586,7 +588,7 @@
             <div class="info-item"><i class="fas fa-file-csv"></i> ${filename}</div>
             <div class="info-item"><i class="fas fa-list-ol"></i> ${rowCount} prompt${rowCount !== 1 ? 's' : ''}</div>
             <div class="info-item"><i class="fas fa-robot"></i> ${groupNames.join(', ')}</div>
-            <div class="info-item"><i class="fas fa-calculator"></i> 4 metrics · ${groupNames.length} models · ${groupNames.length * (groupNames.length - 1) / 2} pairs</div>
+            <div class="info-item"><i class="fas fa-calculator"></i> 4 metrics · ${groupNames.length} responses · ${groupNames.length * (groupNames.length - 1) / 2} pairs</div>
         `;
     }
 
