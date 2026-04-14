@@ -326,6 +326,100 @@
             background: var(--purple-light);
         }
 
+        /* Print button */
+        .print-btn {
+            background: none;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 5px 12px;
+            border-radius: 6px;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s;
+            margin-left: auto;
+        }
+
+        .print-btn:hover {
+            background: var(--purple-light);
+            border-color: var(--purple);
+            color: var(--purple);
+        }
+
+        .card-header { justify-content: space-between; }
+
+        /* ── Print styles ─────────────────────────────────────── */
+        @media print {
+            /* Hide everything by default */
+            body * { visibility: hidden; }
+
+            /* Show only the targeted print region */
+            #printRegion, #printRegion * { visibility: visible; }
+
+            #printRegion {
+                position: absolute;
+                inset: 0;
+                padding: 16px;
+            }
+
+            /* Clean up cards for print */
+            #printRegion .card {
+                border: 1px solid #ccc;
+                border-radius: 0;
+                box-shadow: none;
+                page-break-inside: avoid;
+                margin-bottom: 24px;
+            }
+
+            #printRegion .card-header {
+                background: #f0e8f7 !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            #printRegion .print-btn { display: none; }
+
+            #printRegion .matrix-table th,
+            #printRegion .matrix-table td { border: 1px solid #ccc; }
+
+            #printRegion .matrix-cell {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            #printRegion .info-strip {
+                background: #57068c !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            /* Print header */
+            .print-doc-header { display: block !important; }
+
+            @page { margin: 1.5cm; }
+        }
+
+        .print-doc-header {
+            display: none;
+            font-family: 'Montserrat', sans-serif;
+            margin-bottom: 20px;
+        }
+
+        .print-doc-header h1 {
+            font-size: 18px;
+            color: #57068c;
+            margin-bottom: 4px;
+        }
+
+        .print-doc-header p {
+            font-size: 12px;
+            color: #666;
+        }
+
         /* Tooltip */
         .has-tooltip {
             position: relative;
@@ -513,6 +607,9 @@
         <button class="reset-btn" onclick="document.getElementById('aboutModal').classList.add('open')">
             <i class="fas fa-info-circle"></i> About
         </button>
+        <button class="reset-btn hidden" id="printAllBtn" onclick="printAll()">
+            <i class="fas fa-print"></i> Print All
+        </button>
         <button class="reset-btn hidden" id="resetBtn" onclick="reset()">
             <i class="fas fa-redo-alt"></i> Reset
         </button>
@@ -614,6 +711,9 @@
 
 <!-- Hidden file input -->
 <input type="file" id="csvFile" accept=".csv" class="hidden" onchange="handleFileUpload(event)">
+
+<!-- Print region (populated on demand, invisible until print) -->
+<div id="printRegion" style="display:none;"></div>
 
 <script>
     // ─── CSV Parser (from index.html) ────────────────────────────────────────
@@ -743,6 +843,35 @@
         };
     }
 
+    // ─── Persistence ─────────────────────────────────────────────────────────
+
+    const STORAGE_KEY = 'rc_session';
+
+    function saveSession(rows, filename) {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({ rows, filename }));
+        } catch (e) {
+            // Storage quota exceeded or unavailable — fail silently
+        }
+    }
+
+    function clearSession() {
+        localStorage.removeItem(STORAGE_KEY);
+    }
+
+    function restoreSession() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (!raw) return;
+            const { rows, filename } = JSON.parse(raw);
+            if (rows && rows.length >= 2) {
+                processData(rows, filename, false); // false = don't re-save
+            }
+        } catch (e) {
+            clearSession();
+        }
+    }
+
     // ─── Utilities ───────────────────────────────────────────────────────────
 
     function fmt(score) {
@@ -763,7 +892,8 @@
 
     // ─── Data Processing ─────────────────────────────────────────────────────
 
-    function processData(rows, filename) {
+    function processData(rows, filename, save = true) {
+        if (save) saveSession(rows, filename);
         if (rows.length < 2) {
             showError('CSV must have at least 2 rows (header + 1 data row).');
             return;
@@ -823,6 +953,7 @@
         document.getElementById('uploadScreen').classList.add('hidden');
         document.getElementById('resultsArea').classList.remove('hidden');
         document.getElementById('resetBtn').classList.remove('hidden');
+        document.getElementById('printAllBtn').classList.remove('hidden');
     }
 
     // ─── Render: Info Strip ───────────────────────────────────────────────────
@@ -899,9 +1030,12 @@
 
     function renderMatrix(groupNames, pairs, avgMetrics) {
         const html = `
-            <div class="card">
+            <div class="card" id="card-aggregate">
                 <div class="card-header">
-                    <i class="fas fa-th"></i> Aggregate Similarity Matrix (all prompts)
+                    <span><i class="fas fa-th"></i> Aggregate Similarity Matrix (all prompts)</span>
+                    <button class="print-btn" onclick="printCard('card-aggregate', 'Aggregate Similarity Matrix')">
+                        <i class="fas fa-print"></i> Print
+                    </button>
                 </div>
                 <div class="card-body">
                     ${buildMatrixTable(groupNames, pairs, avgMetrics)}
@@ -924,11 +1058,16 @@
         ];
 
         let html = '';
-        rowResults.forEach(({ id, pairMetrics }) => {
+        rowResults.forEach(({ id, pairMetrics }, idx) => {
+            const cardId = `card-prompt-${idx}`;
+            const safeId = id.replace(/'/g, "\\'");
             html += `
-                <div class="card">
+                <div class="card" id="${cardId}">
                     <div class="card-header">
-                        <i class="fas fa-comment-dots"></i> Prompt: ${id}
+                        <span><i class="fas fa-comment-dots"></i> Prompt: ${id}</span>
+                        <button class="print-btn" onclick="printCard('${cardId}', 'Prompt: ${safeId}')">
+                            <i class="fas fa-print"></i> Print
+                        </button>
                     </div>
                     <div class="card-body">
                         <table class="metrics-table">
@@ -990,13 +1129,47 @@
     // ─── Reset ────────────────────────────────────────────────────────────────
 
     function reset() {
+        clearSession();
         document.getElementById('scoreCardsContainer').innerHTML = '';
         document.getElementById('matrixContainer').innerHTML = '';
         document.getElementById('infoStrip').innerHTML = '';
+        document.getElementById('printRegion').innerHTML = '';
         document.getElementById('resultsArea').classList.add('hidden');
         document.getElementById('uploadScreen').classList.remove('hidden');
         document.getElementById('resetBtn').classList.add('hidden');
+        document.getElementById('printAllBtn').classList.add('hidden');
         clearError();
+    }
+
+    // ─── Print helpers ────────────────────────────────────────────────────────
+
+    function buildPrintDoc(title, bodyHTML) {
+        const strip = document.getElementById('infoStrip').innerHTML;
+        return `
+            <div class="print-doc-header">
+                <h1>AI Writing Style Comparison</h1>
+                <p>${new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' })}</p>
+            </div>
+            <div class="info-strip" style="margin-bottom:20px;">${strip}</div>
+            <div style="font-size:15px;font-weight:700;color:#57068c;margin-bottom:14px;">${title}</div>
+            ${bodyHTML}
+        `;
+    }
+
+    function printCard(cardId, title) {
+        const card = document.getElementById(cardId);
+        if (!card) return;
+        const region = document.getElementById('printRegion');
+        region.innerHTML = buildPrintDoc(title, card.outerHTML);
+        window.print();
+    }
+
+    function printAll() {
+        const aggregate = document.getElementById('matrixContainer').innerHTML;
+        const cards = document.getElementById('scoreCardsContainer').innerHTML;
+        const region = document.getElementById('printRegion');
+        region.innerHTML = buildPrintDoc('All Results', aggregate + cards);
+        window.print();
     }
 
     // ─── Drag-and-drop support ────────────────────────────────────────────────
@@ -1026,6 +1199,9 @@
             showError('Please drop a .csv file.');
         }
     });
+
+    // ─── Restore on load ──────────────────────────────────────────────────────
+    restoreSession();
 </script>
 
 </body>
