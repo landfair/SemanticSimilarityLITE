@@ -352,74 +352,6 @@
 
         .card-header { justify-content: space-between; }
 
-        /* ── Print styles ─────────────────────────────────────── */
-        @media print {
-            /* Hide everything by default */
-            body * { visibility: hidden; }
-
-            /* Show only the targeted print region */
-            #printRegion, #printRegion * { visibility: visible; }
-
-            #printRegion {
-                position: absolute;
-                inset: 0;
-                padding: 16px;
-            }
-
-            /* Clean up cards for print */
-            #printRegion .card {
-                border: 1px solid #ccc;
-                border-radius: 0;
-                box-shadow: none;
-                page-break-inside: avoid;
-                margin-bottom: 24px;
-            }
-
-            #printRegion .card-header {
-                background: #f0e8f7 !important;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-
-            #printRegion .print-btn { display: none; }
-
-            #printRegion .matrix-table th,
-            #printRegion .matrix-table td { border: 1px solid #ccc; }
-
-            #printRegion .matrix-cell {
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-
-            #printRegion .info-strip {
-                background: #57068c !important;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-
-            /* Print header */
-            .print-doc-header { display: block !important; }
-
-            @page { margin: 1.5cm; }
-        }
-
-        .print-doc-header {
-            display: none;
-            font-family: 'Montserrat', sans-serif;
-            margin-bottom: 20px;
-        }
-
-        .print-doc-header h1 {
-            font-size: 18px;
-            color: #57068c;
-            margin-bottom: 4px;
-        }
-
-        .print-doc-header p {
-            font-size: 12px;
-            color: #666;
-        }
-
         /* Tooltip */
         .has-tooltip {
             position: relative;
@@ -712,8 +644,6 @@
 <!-- Hidden file input -->
 <input type="file" id="csvFile" accept=".csv" class="hidden" onchange="handleFileUpload(event)">
 
-<!-- Print region (populated on demand, invisible until print) -->
-<div id="printRegion" style="display:none;"></div>
 
 <script>
     // ─── CSV Parser (from index.html) ────────────────────────────────────────
@@ -1133,7 +1063,6 @@
         document.getElementById('scoreCardsContainer').innerHTML = '';
         document.getElementById('matrixContainer').innerHTML = '';
         document.getElementById('infoStrip').innerHTML = '';
-        document.getElementById('printRegion').innerHTML = '';
         document.getElementById('resultsArea').classList.add('hidden');
         document.getElementById('uploadScreen').classList.remove('hidden');
         document.getElementById('resetBtn').classList.add('hidden');
@@ -1143,33 +1072,75 @@
 
     // ─── Print helpers ────────────────────────────────────────────────────────
 
-    function buildPrintDoc(title, bodyHTML) {
+    function openPrintWindow(title, bodyHTML) {
         const strip = document.getElementById('infoStrip').innerHTML;
-        return `
-            <div class="print-doc-header">
-                <h1>AI Writing Style Comparison</h1>
-                <p>${new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' })}</p>
-            </div>
-            <div class="info-strip" style="margin-bottom:20px;">${strip}</div>
-            <div style="font-size:15px;font-weight:700;color:#57068c;margin-bottom:14px;">${title}</div>
-            ${bodyHTML}
-        `;
+        const date  = new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
+
+        const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>${title}</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Montserrat', sans-serif; font-size: 13px; color: #212529; padding: 24px; }
+  h1 { font-size: 17px; color: #57068c; margin-bottom: 3px; }
+  .doc-meta { font-size: 11px; color: #888; margin-bottom: 16px; }
+  .info-strip { background: #57068c; color: #fff; border-radius: 8px; padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 18px; font-size: 12px; margin-bottom: 20px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .info-item { display: flex; align-items: center; gap: 6px; }
+  .card { border: 1px solid #dee2e6; border-radius: 8px; margin-bottom: 20px; page-break-inside: avoid; overflow: hidden; }
+  .card-header { background: #f0e8f7; border-bottom: 1px solid #dee2e6; padding: 10px 16px; font-weight: 600; font-size: 13px; color: #57068c; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .card-body { padding: 16px; overflow-x: auto; }
+  .print-btn { display: none; }
+  .metrics-table, .matrix-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .metrics-table th, .metrics-table td,
+  .matrix-table th, .matrix-table td { border: 1px solid #dee2e6; padding: 6px 10px; }
+  .metrics-table th { background: #f0e8f7; color: #57068c; font-weight: 600; text-align: center; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .metrics-table th:first-child { text-align: left; }
+  .metrics-table tr:nth-child(even) td { background: #fafafa; }
+  .score-cell { text-align: center; font-weight: 600; color: #57068c; }
+  .matrix-table th { background: #57068c; color: #fff; font-weight: 600; text-align: center; font-size: 11px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .matrix-table th:first-child { background: #f8f9fa; color: transparent; }
+  .matrix-cell { padding: 8px 10px; text-align: center; min-width: 120px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .metric-row { display: flex; justify-content: space-between; font-size: 11px; padding: 1px 0; }
+  .metric-label { opacity: 0.75; }
+  .metric-val { font-weight: 600; }
+  .matrix-diagonal { background: #f1f3f5; color: #6c757d; text-align: center; padding: 8px 10px; font-size: 18px; }
+  .has-tooltip { border-bottom: none; cursor: default; }
+  .tooltip-box { display: none; }
+  @page { margin: 1.5cm; }
+</style>
+</head>
+<body>
+<h1>AI Writing Style Comparison</h1>
+<p class="doc-meta">${title} &nbsp;·&nbsp; ${date}</p>
+<div class="info-strip">${strip}</div>
+${bodyHTML}
+<script>window.onload = function() { window.print(); window.onafterprint = function() { window.close(); }; };<\/script>
+</body>
+</html>`;
+
+        const win = window.open('', '_blank');
+        win.document.write(html);
+        win.document.close();
     }
 
     function printCard(cardId, title) {
         const card = document.getElementById(cardId);
         if (!card) return;
-        const region = document.getElementById('printRegion');
-        region.innerHTML = buildPrintDoc(title, card.outerHTML);
-        window.print();
+        // Clone so we can strip print buttons without mutating the DOM
+        const clone = card.cloneNode(true);
+        clone.querySelectorAll('.print-btn').forEach(b => b.remove());
+        openPrintWindow(title, clone.outerHTML);
     }
 
     function printAll() {
-        const aggregate = document.getElementById('matrixContainer').innerHTML;
-        const cards = document.getElementById('scoreCardsContainer').innerHTML;
-        const region = document.getElementById('printRegion');
-        region.innerHTML = buildPrintDoc('All Results', aggregate + cards);
-        window.print();
+        // Clone both sections, strip print buttons
+        const matrixClone = document.getElementById('matrixContainer').cloneNode(true);
+        const cardsClone  = document.getElementById('scoreCardsContainer').cloneNode(true);
+        [matrixClone, cardsClone].forEach(el => el.querySelectorAll('.print-btn').forEach(b => b.remove()));
+        openPrintWindow('All Results', matrixClone.innerHTML + cardsClone.innerHTML);
     }
 
     // ─── Drag-and-drop support ────────────────────────────────────────────────
