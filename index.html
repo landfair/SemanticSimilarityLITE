@@ -539,6 +539,9 @@
         <button class="reset-btn" onclick="document.getElementById('aboutModal').classList.add('open')">
             <i class="fas fa-info-circle"></i> About
         </button>
+        <button class="reset-btn hidden" id="exportAllBtn" onclick="exportAllXlsx()">
+            <i class="fas fa-file-excel"></i> Export Excel
+        </button>
         <button class="reset-btn hidden" id="printAllBtn" onclick="printAll()">
             <i class="fas fa-print"></i> Print All
         </button>
@@ -860,6 +863,9 @@
         el.textContent = '';
     }
 
+    // ─── Module-level state (populated by processData, used by export) ──────
+    let _state = null;
+
     // ─── Data Processing ─────────────────────────────────────────────────────
 
     function processData(rows, filename, save = true) {
@@ -918,6 +924,8 @@
             levenshtein: s.count ? s.levenshtein / s.count : 0,
         }));
 
+        _state = { filename, groupNames, pairs, avgMetrics, rowResults };
+
         renderInfoStrip(filename, dataRows.length, groupNames);
         renderMatrix(groupNames, pairs, avgMetrics);
         renderScoreCards(rowResults, pairs, groupNames);
@@ -926,6 +934,7 @@
         document.getElementById('resultsArea').classList.remove('hidden');
         document.getElementById('resetBtn').classList.remove('hidden');
         document.getElementById('printAllBtn').classList.remove('hidden');
+        document.getElementById('exportAllBtn').classList.remove('hidden');
     }
 
     // ─── Render: Info Strip ───────────────────────────────────────────────────
@@ -1009,6 +1018,9 @@
             <div class="card" id="card-aggregate">
                 <div class="card-header">
                     <span><i class="fas fa-th"></i> Aggregate Similarity Matrix (all prompts)</span>
+                    <button class="print-btn" onclick="exportCardXlsx('aggregate')">
+                        <i class="fas fa-file-excel"></i> Export
+                    </button>
                     <button class="print-btn" onclick="printCard('card-aggregate', 'Aggregate Similarity Matrix')">
                         <i class="fas fa-print"></i> Print
                     </button>
@@ -1042,6 +1054,9 @@
                 <div class="card" id="${cardId}">
                     <div class="card-header">
                         <span><i class="fas fa-comment-dots"></i> Prompt: ${id}</span>
+                        <button class="print-btn" onclick="exportCardXlsx(${idx})">
+                            <i class="fas fa-file-excel"></i> Export
+                        </button>
                         <button class="print-btn" onclick="printCard('${cardId}', 'Prompt: ${safeId}')">
                             <i class="fas fa-print"></i> Print
                         </button>
@@ -1114,7 +1129,169 @@
         document.getElementById('uploadScreen').classList.remove('hidden');
         document.getElementById('resetBtn').classList.add('hidden');
         document.getElementById('printAllBtn').classList.add('hidden');
+        document.getElementById('exportAllBtn').classList.add('hidden');
         clearError();
+    }
+
+    // ─── Excel export ─────────────────────────────────────────────────────────
+
+    const METRIC_LABELS = ['Cosine Similarity', 'Jaccard Index', 'Q-gram (n=3)', 'Sørensen–Dice', 'Levenshtein'];
+    const METRIC_KEYS   = ['cosine', 'jaccard', 'ngram', 'dice', 'levenshtein'];
+
+    // Escape a value for XML cell content
+    function xmlEsc(v) {
+        return String(v)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    // Build a single SpreadsheetML worksheet string from a 2-D array of rows.
+    // Each cell is { v: value, bold: bool, bg: hex6 (no #), color: hex6 }
+    function buildSheet(rows2d) {
+        const colCount = Math.max(...rows2d.map(r => r.length));
+        // Shared strings aren't needed for SpreadsheetML inline strings
+        let xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+  xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+  xmlns:x="urn:schemas-microsoft-com:office:excel">
+<Styles>
+  <Style ss:ID="header"><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#57068C" ss:Pattern="Solid"/></Style>
+  <Style ss:ID="subheader"><Font ss:Bold="1" ss:Color="#57068C"/><Interior ss:Color="#EEE5F7" ss:Pattern="Solid"/></Style>
+  <Style ss:ID="bold"><Font ss:Bold="1"/></Style>
+  <Style ss:ID="score"><Font ss:Bold="1" ss:Color="#57068C"/><Alignment ss:Horizontal="Center"/></Style>
+  <Style ss:ID="center"><Alignment ss:Horizontal="Center"/></Style>
+  <Style ss:ID="diag"><Interior ss:Color="#F1F3F5" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center"/></Style>
+</Styles>
+<Worksheet ss:Name="Sheet1"><Table>`;
+
+        rows2d.forEach(row => {
+            xml += '<Row>';
+            row.forEach(cell => {
+                const style = cell.style || '';
+                const styleAttr = style ? ` ss:StyleID="${style}"` : '';
+                const val = cell.v == null ? '' : cell.v;
+                // Numbers stored as Number type for proper Excel formatting
+                if (typeof val === 'number') {
+                    xml += `<Cell${styleAttr}><Data ss:Type="Number">${val}</Data></Cell>`;
+                } else {
+                    xml += `<Cell${styleAttr}><Data ss:Type="String">${xmlEsc(val)}</Data></Cell>`;
+                }
+            });
+            xml += '</Row>';
+        });
+
+        xml += '</Table></Worksheet></Workbook>';
+        return xml;
+    }
+
+    function downloadXml(xml, filename) {
+        const blob = new Blob([xml], { type: 'application/vnd.ms-excel;charset=utf-8' });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    // Build rows for the aggregate matrix sheet
+    function buildAggregateSheetRows(groupNames, pairs, avgMetrics) {
+        const rows = [];
+        const N = groupNames.length;
+
+        // Build lookup
+        const lookup = {};
+        pairs.forEach((p, pi) => {
+            lookup[`${p.i},${p.j}`] = pi;
+            lookup[`${p.j},${p.i}`] = pi;
+        });
+
+        // Title row
+        rows.push([{ v: 'Aggregate Similarity Matrix (all prompts)', style: 'header' }]);
+        rows.push([{ v: '' }]); // spacer
+
+        // For each metric, output a labelled sub-table
+        METRIC_KEYS.forEach((key, mi) => {
+            // Metric label header
+            rows.push([{ v: METRIC_LABELS[mi], style: 'subheader' }]);
+            // Column headers
+            const headerRow = [{ v: '' }].concat(groupNames.map(g => ({ v: g, style: 'header' })));
+            rows.push(headerRow);
+            // Data rows
+            for (let r = 0; r < N; r++) {
+                const row = [{ v: groupNames[r], style: 'header' }];
+                for (let c = 0; c < N; c++) {
+                    if (r === c) {
+                        row.push({ v: '—', style: 'diag' });
+                    } else {
+                        const m = avgMetrics[lookup[`${r},${c}`]];
+                        row.push({ v: parseFloat((m[key] * 100).toFixed(1)), style: 'score' });
+                    }
+                }
+                rows.push(row);
+            }
+            rows.push([{ v: '' }]); // spacer between metrics
+        });
+
+        return rows;
+    }
+
+    // Build rows for a single prompt sheet
+    function buildPromptSheetRows(promptResult, pairs) {
+        const { id, pairMetrics } = promptResult;
+        const rows = [];
+
+        rows.push([{ v: `Prompt: ${id}`, style: 'header' }]);
+        rows.push([{ v: '' }]);
+
+        // Metrics × pairs table
+        const headerRow = [{ v: 'Metric', style: 'subheader' }]
+            .concat(pairs.map(p => ({ v: p.label, style: 'subheader' })));
+        rows.push(headerRow);
+
+        METRIC_KEYS.forEach((key, mi) => {
+            const row = [{ v: METRIC_LABELS[mi], style: 'bold' }];
+            pairMetrics.forEach(m => {
+                row.push({ v: parseFloat((m[key] * 100).toFixed(1)), style: 'score' });
+            });
+            rows.push(row);
+        });
+
+        return rows;
+    }
+
+    function exportAllXlsx() {
+        if (!_state) return;
+        const { filename, groupNames, pairs, avgMetrics, rowResults } = _state;
+
+        // One sheet: aggregate matrix then all prompts stacked
+        const rows = buildAggregateSheetRows(groupNames, pairs, avgMetrics);
+        rowResults.forEach(r => {
+            rows.push([{ v: '' }]);
+            rows.push(...buildPromptSheetRows(r, pairs));
+        });
+
+        const baseName = filename.replace(/\.csv$/i, '');
+        downloadXml(buildSheet(rows), `${baseName}_similarity.xls`);
+    }
+
+    function exportCardXlsx(which) {
+        if (!_state) return;
+        const { filename, groupNames, pairs, avgMetrics, rowResults } = _state;
+        const baseName = filename.replace(/\.csv$/i, '');
+
+        let rows, dlName;
+        if (which === 'aggregate') {
+            rows   = buildAggregateSheetRows(groupNames, pairs, avgMetrics);
+            dlName = `${baseName}_aggregate.xls`;
+        } else {
+            rows   = buildPromptSheetRows(rowResults[which], pairs);
+            dlName = `${baseName}_prompt${which + 1}.xls`;
+        }
+
+        downloadXml(buildSheet(rows), dlName);
     }
 
     // ─── Print helpers ────────────────────────────────────────────────────────
