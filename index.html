@@ -609,6 +609,19 @@
                 </ol>
                 <p class="caveat">Always ≥ Jaccard for the same pair. If Jaccard = J, then Dice = 2J / (1 + J). Both metrics reach 1.0 only when the two vocabulary sets are identical.</p>
             </div>
+
+            <div class="metric-block">
+                <h3><i class="fas fa-keyboard"></i> Levenshtein Distance (normalized) <span class="metric-tag">Edit distance</span></h3>
+                <p>Counts the minimum number of single-character edits — insertions, deletions, and substitutions — needed to transform one text into the other. The raw count is normalized to [0, 1] by dividing by the length of the longer text, then inverted so that 1 = identical and 0 = completely different.</p>
+                <div class="formula">Lev(A, B) = 1 − editDistance(A, B) / max(|A|, |B|)</div>
+                <ol class="steps">
+                    <li>Lowercase both texts.</li>
+                    <li>Run the standard dynamic-programming edit-distance algorithm (two-row DP, O(m×n) time).</li>
+                    <li>Divide the edit count by the length of the longer text.</li>
+                    <li>Subtract from 1 to convert distance → similarity.</li>
+                </ol>
+                <p class="caveat">Operates on the full raw text — sensitive to punctuation, whitespace, and word order. Unlike the other four metrics, reordering sentences changes the score even if the word sets are identical. Computation time scales with the product of both text lengths, so very long responses will be slower to compute.</p>
+            </div>
         </div>
     </div>
 </div>
@@ -618,7 +631,7 @@
     <div class="upload-card" id="uploadCard">
         <div class="upload-icon"><i class="fas fa-file-csv"></i></div>
         <h2>Upload Comparison CSV</h2>
-        <p>Upload a CSV file with one column per response. Every response is compared against every other response using four metrics.</p>
+        <p>Upload a CSV file with one column per response. Every response is compared against every other response using five metrics.</p>
         <button class="upload-btn" onclick="document.getElementById('csvFile').click()">
             <i class="fas fa-upload"></i> Choose CSV File
         </button>
@@ -764,12 +777,39 @@
         return (2 * intersection.size) / (set1.size + set2.size);
     }
 
+    // Returns a normalized similarity score in [0, 1]:
+    //   1 − (editDistance / maxLength)
+    // Runs on the raw (lowercased) text, not tokens, to capture character-level differences.
+    function levenshteinSimilarity(text1, text2) {
+        const a = text1.toLowerCase();
+        const b = text2.toLowerCase();
+        if (a === b) return 1;
+        if (a.length === 0 || b.length === 0) return 0;
+        const s1 = a, s2 = b;
+        const m = s1.length, n = s2.length;
+        // Use two-row DP to save memory
+        let prev = Array.from({ length: n + 1 }, (_, i) => i);
+        let curr = new Array(n + 1);
+        for (let i = 1; i <= m; i++) {
+            curr[0] = i;
+            for (let j = 1; j <= n; j++) {
+                curr[j] = s1[i - 1] === s2[j - 1]
+                    ? prev[j - 1]
+                    : 1 + Math.min(prev[j - 1], prev[j], curr[j - 1]);
+            }
+            [prev, curr] = [curr, prev];
+        }
+        const dist = prev[n];
+        return 1 - dist / Math.max(m, n);
+    }
+
     function computeAllMetrics(text1, text2) {
         return {
-            cosine:  cosineSimilarity(text1, text2),
-            jaccard: jaccardSimilarity(text1, text2),
-            ngram:   ngramSimilarity(text1, text2, 3),
-            dice:    sorensenDice(text1, text2)
+            cosine:      cosineSimilarity(text1, text2),
+            jaccard:     jaccardSimilarity(text1, text2),
+            ngram:       ngramSimilarity(text1, text2, 3),
+            dice:        sorensenDice(text1, text2),
+            levenshtein: levenshteinSimilarity(text1, text2)
         };
     }
 
@@ -848,7 +888,7 @@
         }
 
         // Per-row metrics + accumulators for averages
-        const sums = pairs.map(() => ({ cosine: 0, jaccard: 0, ngram: 0, dice: 0, count: 0 }));
+        const sums = pairs.map(() => ({ cosine: 0, jaccard: 0, ngram: 0, dice: 0, levenshtein: 0, count: 0 }));
         const rowResults = [];
 
         dataRows.forEach(row => {
@@ -858,10 +898,11 @@
                 const t1 = texts[pair.i] || '';
                 const t2 = texts[pair.j] || '';
                 const m = computeAllMetrics(t1, t2);
-                sums[pi].cosine  += m.cosine;
-                sums[pi].jaccard += m.jaccard;
-                sums[pi].ngram   += m.ngram;
-                sums[pi].dice    += m.dice;
+                sums[pi].cosine      += m.cosine;
+                sums[pi].jaccard     += m.jaccard;
+                sums[pi].ngram       += m.ngram;
+                sums[pi].dice        += m.dice;
+                sums[pi].levenshtein += m.levenshtein;
                 sums[pi].count++;
                 return m;
             });
@@ -870,10 +911,11 @@
 
         // Averages per pair
         const avgMetrics = sums.map(s => ({
-            cosine:  s.count ? s.cosine  / s.count : 0,
-            jaccard: s.count ? s.jaccard / s.count : 0,
-            ngram:   s.count ? s.ngram   / s.count : 0,
-            dice:    s.count ? s.dice    / s.count : 0,
+            cosine:      s.count ? s.cosine      / s.count : 0,
+            jaccard:     s.count ? s.jaccard     / s.count : 0,
+            ngram:       s.count ? s.ngram       / s.count : 0,
+            dice:        s.count ? s.dice        / s.count : 0,
+            levenshtein: s.count ? s.levenshtein / s.count : 0,
         }));
 
         renderInfoStrip(filename, dataRows.length, groupNames);
@@ -893,7 +935,7 @@
             <div class="info-item"><i class="fas fa-file-csv"></i> ${filename}</div>
             <div class="info-item"><i class="fas fa-list-ol"></i> ${rowCount} prompt${rowCount !== 1 ? 's' : ''}</div>
             <div class="info-item"><i class="fas fa-robot"></i> ${groupNames.join(', ')}</div>
-            <div class="info-item"><i class="fas fa-calculator"></i> 4 metrics · ${groupNames.length} responses · ${groupNames.length * (groupNames.length - 1) / 2} pairs</div>
+            <div class="info-item"><i class="fas fa-calculator"></i> 5 metrics · ${groupNames.length} responses · ${groupNames.length * (groupNames.length - 1) / 2} pairs</div>
         `;
     }
 
@@ -925,7 +967,7 @@
                 } else {
                     const pi = lookup[`${r},${c}`];
                     const m = metricsPerPair[pi];
-                    const avg = (m.cosine + m.jaccard + m.ngram + m.dice) / 4;
+                    const avg = (m.cosine + m.jaccard + m.ngram + m.dice + m.levenshtein) / 5;
                     const bg = `rgba(87,6,140,${(avg * 0.65).toFixed(3)})`;
                     const textColor = avg > 0.55 ? '#ffffff' : 'var(--text-dark)';
                     html += `
@@ -946,6 +988,10 @@
                                 <div class="metric-row">
                                     <span class="metric-label has-tooltip" style="border-bottom-color:currentColor;">Dice<span class="tooltip-box" style="color:#fff;">Like Jaccard but doubles the intersection weight: 2|A∩B| / (|A|+|B|). Always ≥ Jaccard.</span></span>
                                     <span class="metric-val">${fmt(m.dice)}</span>
+                                </div>
+                                <div class="metric-row">
+                                    <span class="metric-label has-tooltip" style="border-bottom-color:currentColor;">Levenshtein<span class="tooltip-box" style="color:#fff;">Normalized edit distance: 1 − (edits / maxLength). Counts minimum insertions, deletions, and substitutions to transform one text into the other. Runs on the full raw text.</span></span>
+                                    <span class="metric-val">${fmt(m.levenshtein)}</span>
                                 </div>
                             </div>
                         </td>`;
@@ -978,13 +1024,14 @@
 
     function renderScoreCards(rowResults, pairs, groupNames) {
         const container = document.getElementById('scoreCardsContainer');
-        const metricLabels = ['Cosine Similarity', 'Jaccard Index', 'Q-gram (n=3)', 'Sørensen–Dice'];
-        const metricKeys  = ['cosine', 'jaccard', 'ngram', 'dice'];
+        const metricLabels = ['Cosine Similarity', 'Jaccard Index', 'Q-gram (n=3)', 'Sørensen–Dice', 'Levenshtein'];
+        const metricKeys  = ['cosine', 'jaccard', 'ngram', 'dice', 'levenshtein'];
         const metricTips  = [
             'Word-frequency vectors. Measures the angle between two texts\' word-count vectors. Captures proportional word usage regardless of text length. Range: 0–1.',
             'Unique-word set overlap. |intersection| / |union|. Each word counted once. Always ≤ Dice for the same pair. Range: 0–1.',
             'Overlapping 3-character substrings (trigrams). Catches partial matches and morphological variation that word-level metrics miss. Range: 0–1.',
-            'Like Jaccard but weights shared words double: 2|A∩B| / (|A|+|B|). Always ≥ Jaccard. Reaches 1 only when both vocabulary sets are identical. Range: 0–1.'
+            'Like Jaccard but weights shared words double: 2|A∩B| / (|A|+|B|). Always ≥ Jaccard. Reaches 1 only when both vocabulary sets are identical. Range: 0–1.',
+            'Normalized edit distance: 1 − (edits / maxLength). Counts the minimum insertions, deletions, and substitutions to transform one text into the other. Operates on the full raw text. Range: 0–1.'
         ];
 
         let html = '';
